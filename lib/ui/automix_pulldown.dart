@@ -7,12 +7,6 @@ import 'package:sidedeck/state/backup_tracks.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sidedeck/automix/transition_style.dart';
 import 'package:sidedeck/automix/set_flow.dart';
-import 'package:sidedeck/soulseek/slsk_keeper.dart';
-import 'package:sidedeck/soulseek/slsk_setup.dart';
-import 'package:sidedeck/soulseek/soulseek_client.dart';
-import 'package:sidedeck/suggest/auto_fetch.dart';
-import 'package:sidedeck/ui/genre_picker.dart';
-import 'package:sidedeck/ui/soulseek_page.dart';
 import 'package:sidedeck/state/dj_controller.dart';
 import 'package:sidedeck/state/library_controller.dart';
 import 'package:sidedeck/state/look_controller.dart';
@@ -43,7 +37,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
   // behind the decks on every 50 ms update made the whole app stutter.
   bool _showPanel = false;
   Timer? _hideTimer;
-  late final Widget _picker = GenrePicker(library: widget.library);
 
   void _setOpen(bool v) {
     if (_open == v) return;
@@ -97,14 +90,7 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
   void _applyDecades({bool save = true}) {
     final from = _dec.start.round(), to = _dec.end.round() + 9;
     widget.dj.decadeRange = _decOn ? (from, to) : null;
-    final af = AutoFetch.instance;
-    af.useYearRange = _decOn;
-    if (_decOn) {
-      af.yearFrom = from;
-      af.yearTo = to;
-    }
     if (save) {
-      af.save();
       SharedPreferences.getInstance().then((p) {
         p.setBool('automix_dec_on', _decOn);
         p.setInt('automix_dec_from', from);
@@ -202,9 +188,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
           _playlists,
           widget.library,
           LookController.instance,
-          soulseek,
-          SlskKeeper.instance,
-          AutoFetch.instance,
         ]),
         builder: (context, _) {
           return Column(
@@ -269,11 +252,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
 
   Future<void> _start(List<String> paths) async {
     final dj = widget.dj;
-    // The Soulseek helper is part of Start: stay signed in, fetch matches.
-    if (_helper) {
-      SlskKeeper.instance.setEnabled(true);
-      SlskSetup.setAutoFetchForAutomix(true);
-    }
     await dj.startAutomix(paths,
         fadeSeconds: _fade,
         startOffsetSeconds: _offset,
@@ -282,25 +260,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
         style: _style);
     // Stay open when it could not start, so the reason stays visible.
     if (mounted && dj.automixOn) _setOpen(false);
-  }
-
-  bool get _helper => SlskKeeper.instance.enabled && SlskSetup.autoFetchForAutomix;
-
-  Future<void> _setHelper(bool v) async {
-    await SlskKeeper.instance.setEnabled(v);
-    await SlskSetup.setAutoFetchForAutomix(v);
-    if (mounted) setState(() {});
-  }
-
-  String _soulseekLine() {
-    if (soulseek.online) {
-      final af = AutoFetch.instance;
-      if (af.running && af.status.isNotEmpty) return af.status;
-      return 'Connected to Soulseek';
-    }
-    if (soulseek.status == SlskStatus.connecting) return 'Connecting to Soulseek…';
-    final note = SlskKeeper.instance.note;
-    return note.isEmpty ? 'Not connected to Soulseek' : note;
   }
 
   Widget _step(String n, String title, String help, Widget child) {
@@ -337,7 +296,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
     final choice = _choice(lists);
     final hasMusic = widget.library.tracks.isNotEmpty || lists.isNotEmpty;
     final on = dj.automixOn;
-    final signedIn = soulseek.online || soulseek.status == SlskStatus.connecting;
     return GestureDetector(
       onVerticalDragEnd: (d) {
         if ((d.primaryVelocity ?? 0) < -120) _setOpen(false);
@@ -424,53 +382,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
                   ),
                 ),
               ),
-              _step(
-                '2',
-                'Find new tracks for me',
-                'Stays signed in to Soulseek and downloads a matching track '
-                    'whenever nothing left in the list fits. Needs a free Soulseek account.',
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text('Keep me connected and fetch matches'),
-                      value: _helper,
-                      onChanged: _setHelper,
-                    ),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 10,
-                          color: soulseek.online
-                              ? Colors.greenAccent
-                              : (soulseek.status == SlskStatus.connecting
-                                  ? Colors.amber
-                                  : Colors.redAccent),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(_soulseekLine(),
-                              style: const TextStyle(fontSize: 12),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                        if (!signedIn)
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => SoulseekPage(library: widget.library),
-                              ),
-                            ),
-                            child: const Text('Sign in'),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
             _step(
               '3',
               'Timing',
@@ -487,7 +398,7 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
               _step(
                 '3b',
                 'Decades',
-                'Only play and fetch music from the decades you pick (by release year; tracks with no year are let through).',
+                'Only play music from the decades you pick (by release year; tracks with no year are let through).',
                 Column(
                   children: [
                     SwitchListTile(
@@ -514,30 +425,6 @@ class _AutomixPullDownState extends State<AutomixPullDown> {
                       ),
                   ],
                 ),
-              ),
-              _step(
-                '3c',
-                'Bands and electronic',
-                'Off: Auto DJ plays band music (rock, indie, punk, goth...) only when you pick a band genre, '
-                    'and electronic music otherwise, never both. On: they can mix.',
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: const Text('Mix bands and electronic'),
-                  value: AutoFetch.instance.mixKinds,
-                  onChanged: (v) => setState(() {
-                    AutoFetch.instance.mixKinds = v;
-                    AutoFetch.instance.save();
-                    widget.dj.refresh();
-                  }),
-                ),
-              ),
-              _step(
-                '4',
-                'Pick a genre and shop',
-                'Choose a genre, tempo and where to look. The track is downloaded '
-                    'right away and plays next.',
-                _picker,
               ),
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),

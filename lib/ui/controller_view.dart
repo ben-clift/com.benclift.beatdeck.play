@@ -8,7 +8,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:sidedeck/debug/debug_log.dart';
 import 'package:sidedeck/engine/music_utils.dart';
 import 'package:sidedeck/state/dj_controller.dart';
-import 'package:sidedeck/suggest/auto_fetch.dart';
 import 'package:sidedeck/state/dislikes.dart';
 import 'package:sidedeck/state/library_controller.dart';
 import 'package:sidedeck/state/look_controller.dart';
@@ -598,19 +597,17 @@ class _DeckPanelState extends State<_DeckPanel> {
     }
     final path = d.path;
     final name = d.title;
-    // 0 cancel, 1 remove for good, 2 remove and fetch it again
+    // 0 cancel, 1 remove for good, 2 remove (may be played again)
     final choice = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remove this track?'),
         content: Text(
             '$name\n\nIt comes off the deck and is deleted from this phone.\n\n'
-            '"Remove and get it again" keeps it on your wish list: a fresh copy is '
-            'downloaded from Soulseek in the background (use it for a bad or partial '
-            'download). "Remove for good" means it is never played or searched for again.'),
+            '"Remove for good" means it is never played again.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, 0), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, 2), child: const Text('Remove and get it again')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 2), child: const Text('Remove')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             onPressed: () => Navigator.pop(ctx, 1),
@@ -621,8 +618,6 @@ class _DeckPanelState extends State<_DeckPanel> {
     );
     if (choice == null || choice == 0 || !mounted) return;
     final forGood = choice == 1;
-    final deckArtist = d.artist;
-    final deckTitle = d.title;
     final err = widget.dj.removeFromDeck(widget.index);
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
@@ -639,28 +634,12 @@ class _DeckPanelState extends State<_DeckPanel> {
         } catch (_) {}
       }
     }
-    if (!forGood) {
-      // Search by artist and title from the name on the deck (or the file name).
-      var artist = deckArtist;
-      var title = deckTitle;
-      if (artist.isEmpty && path != null) {
-        final base = path.split(RegExp(r'[\\/]')).last.replaceFirst(RegExp(r'\.[^.]+$'), '');
-        final dash = base.indexOf(' - ');
-        if (dash > 0) {
-          artist = base.substring(0, dash).replaceFirst(RegExp(r'^\d+[\.\s-]+'), '').trim();
-          title = base.substring(dash + 3).trim();
-        } else {
-          title = base;
-        }
-      }
-      AutoFetch.instance.refetch(artist, title, widget.library);
-    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(forGood
-            ? 'Removed. It will not be played or searched for again.'
-            : 'Removed. Getting a fresh copy from Soulseek in the background.'),
+            ? 'Removed. It will not be played again.'
+            : 'Removed.'),
       ),
     );
   }
@@ -758,7 +737,7 @@ class _DeckPanelState extends State<_DeckPanel> {
                 ),
               if (d.loaded && widget.dj.automixOn)
                 IconButton(
-                  tooltip: 'More like this: library first, then Soulseek',
+                  tooltip: 'More like this: from your library',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),

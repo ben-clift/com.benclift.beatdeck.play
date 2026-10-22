@@ -12,14 +12,10 @@ import 'package:sidedeck/state/library_controller.dart';
 import 'package:sidedeck/state/playlist_controller.dart';
 import 'package:sidedeck/ui/playlists_panel.dart';
 import 'package:sidedeck/ui/free_music_page.dart';
-import 'package:sidedeck/ui/soulseek_page.dart';
-import 'package:sidedeck/ui/suggest_page.dart';
-import 'package:sidedeck/ui/wishlist_page.dart';
 import 'package:sidedeck/subsonic/subsonic_client.dart';
 import 'package:sidedeck/state/backup_tracks.dart';
 import 'package:sidedeck/ui/export_sheet.dart';
 import 'package:sidedeck/state/ratings.dart';
-import 'package:sidedeck/suggest/auto_fetch.dart';
 import 'package:sidedeck/suggest/genres.dart';
 import 'package:sidedeck/theme/sidedeck_theme.dart';
 
@@ -560,17 +556,6 @@ class _LibraryOverlayState extends State<LibraryOverlay> {
                       icon: const Icon(Icons.content_copy, size: 22),
                     ),
                     IconButton(
-                      tooltip: 'Suggest what mixes with the playing track',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              SuggestPage(dj: widget.dj, library: lib),
-                        ),
-                      ),
-                      icon: const Icon(Icons.auto_awesome, size: 22),
-                    ),
-                    IconButton(
                       tooltip: 'Free music (Jamendo, Internet Archive)',
                       visualDensity: VisualDensity.compact,
                       onPressed: () => Navigator.of(context).push(
@@ -579,30 +564,6 @@ class _LibraryOverlayState extends State<LibraryOverlay> {
                         ),
                       ),
                       icon: const Icon(Icons.library_music, size: 22),
-                    ),
-                    IconButton(
-                      tooltip: 'Search Soulseek',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => SoulseekPage(library: lib),
-                        ),
-                      ),
-                      icon: const Icon(Icons.travel_explore, size: 22),
-                    ),
-                    IconButton(
-                      tooltip: 'Open Seeker (Soulseek)',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final ok = await AppLauncher.openByName('Seeker');
-                        if (!ok) {
-                          messenger.showSnackBar(const SnackBar(
-                            content: Text('Seeker is not installed on this phone'),
-                          ));
-                        }
-                      },
-                      icon: const Icon(Icons.cloud_download, size: 22),
                     ),
                     IconButton(
                       tooltip: 'Add files (phone, Drive or other cloud)',
@@ -841,7 +802,7 @@ class _LibraryOverlayState extends State<LibraryOverlay> {
   /// Tap the genre: why it was fetched, what it is tagged as, and a list to
   /// change it.
   void _genreMenu(LibraryTrack t) {
-    final asked = AutoFetch.instance.askedFor[t.path] ?? '';
+    const asked = '';
     final typed = TextEditingController();
     showModalBottomSheet<void>(
       context: context,

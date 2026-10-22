@@ -484,7 +484,7 @@ class DjController extends ChangeNotifier {
       automixOn ? math.max(0, _automixQueue.length - _automixIndex - 1) : 0;
 
   /// Called when nothing left in the queue fits the playing track (tempo or
-  /// key); the app uses it to fetch a matching track from Soulseek.
+  /// key); the app uses it to fetch a matching track online.
   void Function(String artist, double bpm, CamelotKey? key, String title, String genre)? onNeedTrack;
   String? _needAsked;
   DateTime _needAskedAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -536,13 +536,13 @@ class DjController extends ChangeNotifier {
       artist = head;
       title = name;
     }
-    DebugLog.add('automix', 'nothing in the queue fits $name (${cur.bpm.round()} BPM), asking Soulseek for a match');
+    DebugLog.add('automix', 'nothing in the queue fits $name (${cur.bpm.round()} BPM), looking for more music for a match');
     cb(artist, cur.bpm, cur.key, title, genreOf?.call(path) ?? '');
   }
 
   /// "More like this": look through the library (the automix list) for a
   /// track that fits this deck's track and play it next; if there is none,
-  /// ask Soulseek for one like it. Returns what happened, for the screen.
+  /// ask online music for one like it. Returns what happened, for the screen.
   String automixMoreLike(int deckIndex) {
     if (!automixOn || _automixDeck < 0) return 'Start Auto DJ first.';
     if (_automixFading) {
@@ -612,15 +612,15 @@ class DjController extends ChangeNotifier {
       automixStatus = 'More like this: mixing in ${shown(best)}';
       DebugLog.add('automix', 'more like this: library pick ${shown(best)}');
       msg = 'Mixing in ${shown(best)} from your library'
-          '${canAsk ? '. Asking Soulseek for a better match too.' : '.'}';
+          '${canAsk ? '. Looking for more music for a better match too.' : '.'}';
       _setMoreLike(canAsk
-          ? 'Mixing in ${shown(best)} (library). Asking Soulseek for a better match; it switches if one arrives.'
+          ? 'Mixing in ${shown(best)} (library). Looking for more music for a better match; it switches if one arrives.'
           : 'Mixing in ${shown(best)} (library).');
     } else {
       msg = canAsk
-          ? 'Nothing unplayed in the library. Asking Soulseek: it plays next when it arrives.'
-          : 'Nothing unplayed in the library, and Soulseek fetching is off.';
-      _setMoreLike(canAsk ? 'Asking Soulseek for something like this…' : msg);
+          ? 'Nothing unplayed in the library. Looking for more music: it plays next when it arrives.'
+          : 'Nothing unplayed in the library, and fetching is off.';
+      _setMoreLike(canAsk ? 'Looking for more music for something like this…' : msg);
     }
     if (canAsk) {
       final name = shown(path);
@@ -636,7 +636,7 @@ class DjController extends ChangeNotifier {
       }
       armPlayNext();
       _moreLikeArmed = true;
-      DebugLog.add('automix', 'more like this: asking Soulseek like $name');
+      DebugLog.add('automix', 'more like this: looking for more music like $name');
       cb(artist, src?.bpm ?? 0, src?.key, title, srcGenre);
     }
     notifyListeners();
@@ -659,7 +659,7 @@ class DjController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// A new track (for example a finished Soulseek download) joins the end of
+  /// A new track (for example a finished online music download) joins the end of
   /// the automix queue if automix is running.
   void automixAppend(String path) {
     if (!automixOn || _automixQueue.contains(path)) return;
@@ -680,11 +680,11 @@ class DjController extends ChangeNotifier {
       DebugLog.add('automix', 'your genre choice arrived, playing it next: ${path.split(RegExp(r'[\\/]')).last}');
       if (_moreLikeArmed) {
         _moreLikeArmed = false;
-        _setMoreLike('Soulseek found ${path.split(RegExp(r'[\\/]')).last.replaceFirst(RegExp(r'\.[^.]+$'), '')}: switching to it.', seconds: 12);
+        _setMoreLike('Found ${path.split(RegExp(r'[\\/]')).last.replaceFirst(RegExp(r'\.[^.]+$'), '')}: switching to it.', seconds: 12);
       }
     } else if (_moreLikeArmed && _automixFading) {
       _moreLikeArmed = false;
-      _setMoreLike('Soulseek found one: it plays after this mix.', seconds: 12);
+      _setMoreLike('Found one: it plays after this mix.', seconds: 12);
     }
     // A fresh download plays before the playlist's own tracks (the genre and
     // tempo checks still apply when it loads).
@@ -788,7 +788,7 @@ class DjController extends ChangeNotifier {
       _markPlayed(pressed);
     }
     if (best == null) {
-      DebugLog.add('automix', 'skip: nothing unplayed in the library, asking Soulseek');
+      DebugLog.add('automix', 'skip: nothing unplayed in the library, looking for more music');
       if (onPlaying) {
         _skipAt = DateTime.now();
       } else {
@@ -796,8 +796,8 @@ class DjController extends ChangeNotifier {
         if (pressed != null) _rejected.add(pressed);
       }
       _loadHold = DateTime(2000);
-      automixStatus = 'Skipped: nothing in the library, getting one from Soulseek…';
-      _setMoreLike('Skip: nothing unplayed in the library, asking Soulseek for one.', seconds: 20);
+      automixStatus = 'Skipped: nothing in the library, looking for one…';
+      _setMoreLike('Skip: nothing unplayed in the library, looking for more music for one.', seconds: 20);
       _askForTrackNow();
       notifyListeners();
       return null;
@@ -866,7 +866,7 @@ class DjController extends ChangeNotifier {
     return best;
   }
 
-  /// After a skip, look for a track at once (queue first, then Soulseek)
+  /// After a skip, look for a track at once (queue first, then online)
   /// instead of waiting out the usual pauses between asks.
   void _askForTrackNow() {
     _needCheck = DateTime.fromMillisecondsSinceEpoch(0);
@@ -1757,7 +1757,7 @@ class DjController extends ChangeNotifier {
       // Nothing to put on the other deck yet: say so, and keep asking.
       final text = (fetchBusy?.call() ?? false)
           ? (fetchStatus?.call() ?? 'Finding the next track…')
-          : _idleReason('No track fits yet. Looking for one (Soulseek helper), or add music.');
+          : _idleReason('No track fits yet. Looking for one (helper), or add music.');
       if (automixStatus != text) {
         automixStatus = text;
         return true;
@@ -2059,7 +2059,7 @@ class DjController extends ChangeNotifier {
     return st.isNotEmpty ? st : automixStatus;
   }
 
-  /// Automix started or stopped (the app switches AUTO and Soulseek with it).
+  /// Automix started or stopped (the app switches AUTO and online music with it).
   void Function()? onAutomixStart;
   void Function()? onAutomixStop;
 
@@ -2098,7 +2098,7 @@ class DjController extends ChangeNotifier {
       final busy = fetchBusy?.call() ?? false;
       final text = busy
           ? (fetchStatus?.call() ?? 'Finding a matching track…')
-          : 'No suitable track left. Looking for one (Soulseek helper), or add music.';
+          : 'No suitable track left. Looking for one (helper), or add music.';
       if (automixStatus != text) {
         automixStatus = text;
         return true;
