@@ -540,16 +540,6 @@ class _LibraryOverlayState extends State<LibraryOverlay> {
                       icon: const Icon(Icons.refresh, size: 22),
                     ),
                     IconButton(
-                      tooltip: 'Song wish lists (from Spotify, Deezer and more)',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => WishListPage(library: lib),
-                        ),
-                      ),
-                      icon: const Icon(Icons.playlist_add_check, size: 22),
-                    ),
-                    IconButton(
                       tooltip: 'Find and delete duplicate tracks',
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _duplicates(lib),
